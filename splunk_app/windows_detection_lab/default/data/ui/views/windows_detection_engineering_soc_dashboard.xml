@@ -1,0 +1,564 @@
+<form version="1.1" theme="dark">
+  <label>Windows Detection Engineering SOC Dashboard</label>
+  <description>SOC dashboard for Windows Security and Sysmon detection monitoring, authentication activity, endpoint execution, persistence, defense evasion, and network activity.</description>
+  <!-- ====================================================== -->
+  <!-- ROW 1 - SECURITY OVERVIEW                              -->
+  <!-- ====================================================== -->
+  <!-- ====================================================== -->
+  <!-- ROW 2 - AUTHENTICATION                                 -->
+  <!-- ====================================================== -->
+  <!-- ====================================================== -->
+  <!-- ROW 3 - ENDPOINT / EXECUTION                           -->
+  <!-- ====================================================== -->
+  <!-- ====================================================== -->
+  <!-- ROW 4 - PERSISTENCE                                    -->
+  <!-- ====================================================== -->
+  <!-- ====================================================== -->
+  <!-- ROW 5 - DEFENSE EVASION / NETWORK                      -->
+  <!-- ====================================================== -->
+  <!-- ====================================================== -->
+  <!-- ROW 6 - PRIVILEGED ACTIVITY                            -->
+  <!-- ====================================================== -->
+  <!-- ====================================================== -->
+  <!-- ROW 7 - DETECTION ACTIVITY                             -->
+  <!-- ====================================================== -->
+  <!-- ====================================================== -->
+  <!-- ROW 8 - RECENT SECURITY ACTIVITY                       -->
+  <!-- ====================================================== -->
+  <!-- ====================================================== -->
+  <!-- ROW 9 - DETECTION COVERAGE                             -->
+  <!-- ====================================================== -->
+  <fieldset submitButton="false">
+    <input type="time" token="global_time">
+      <label>Time Range</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Total Security Events</title>
+      <single>
+        <search>
+          <query>
+            index=windows_security sourcetype="XmlWinEventLog:Security"
+            | stats count
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x5C8ED6"]</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Failed Logons</title>
+      <single>
+        <search>
+          <query>index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=4625
+            | stats count</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x65A637","0xF8BE34","0xDC4E41"]</option>
+        <option name="rangeValues">[0,10]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Successful Logons</title>
+      <single>
+        <search>
+          <query>index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=4624
+            | stats count</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x5C8ED6","0xd94e17","0x3c444d","0x3c444d","0x118832"]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Privileged Logons</title>
+      <single>
+        <search>
+          <query>
+            index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=4672
+            | stats count
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x65A637","0xF8BE34","0xDC4E41"]</option>
+        <option name="rangeValues">[0,50]</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Security Log Cleared</title>
+      <single>
+        <search>
+          <query>
+            index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=1102
+            | stats count
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x65A637","0xd94e17"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Failed Logons Over Time</title>
+      <chart>
+        <search>
+          <query>index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=4625
+            | timechart span=15m count</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Successful Logons Over Time</title>
+      <chart>
+        <search>
+          <query>
+            index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=4624
+            | timechart span=15m count
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Authentication Correlation</title>
+      <table>
+        <search>
+          <query>index=windows_security sourcetype="XmlWinEventLog:Security"
+            (EventCode=4624 OR EventCode=4625)
+            | sort 0 host _time
+            | streamstats window=10 current=f
+                last(EventCode) as PreviousEventCode
+                last(_time) as PreviousEventTime
+                by host
+            | where EventCode=4624 AND PreviousEventCode=4625
+            | eval TimeBetween=round(_time-PreviousEventTime,2)
+            | where TimeBetween &lt;= 300
+            | table _time host PreviousEventCode PreviousEventTime TimeBetween EventCode
+            | sort 0 - _time</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">row</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Process Creation</title>
+      <single>
+        <search>
+          <query>
+            index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
+            | stats count
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x5C8ED6"]</option>
+      </single>
+    </panel>
+    <panel>
+      <title>PowerShell Execution</title>
+      <single>
+        <search>
+          <query>index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
+            | search Image="*\\powershell.exe" OR Image="*\\pwsh.exe"
+            | stats count</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x65A637","0xd41f1f","0xDC4E41"]</option>
+        <option name="rangeValues">[0,10]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Network Connections</title>
+      <single>
+        <search>
+          <query>index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
+            | stats count</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x5C8ED6","0x3c444d","0x3c444d","0x3c444d","0x3c444d"]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>LSASS Process Access</title>
+      <single>
+        <search>
+          <query>index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=10
+            | search TargetImage="*\\lsass.exe"
+            | stats count</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x65A637","0xF8BE34","0x118832"]</option>
+        <option name="rangeValues">[0,10]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>File Creation</title>
+      <single>
+        <search>
+          <query>
+            index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=11
+            | stats count
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x5C8ED6"]</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Registry Modifications</title>
+      <single>
+        <search>
+          <query>
+            index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=13
+            | stats count
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x5C8ED6"]</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Registry Run Key Persistence</title>
+      <single>
+        <search>
+          <query>
+            index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=13
+            | search TargetObject="*\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\*"
+                OR TargetObject="*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\*"
+            | stats count
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x65A637","0xDC4E41"]</option>
+        <option name="rangeValues">[0]</option>
+      </single>
+    </panel>
+    <panel>
+      <title>New User Accounts</title>
+      <single>
+        <search>
+          <query>
+            index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=4720
+            | stats count
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x65A637","0xDC4E41"]</option>
+        <option name="rangeValues">[0]</option>
+      </single>
+    </panel>
+    <panel>
+      <title>New Services</title>
+      <single>
+        <search>
+          <query>
+            index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=4697
+            | stats count
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x65A637","0x1182f3"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Scheduled Tasks</title>
+      <single>
+        <search>
+          <query>
+            index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=4698
+            | stats count
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x65A637","0xDC4E41"]</option>
+        <option name="rangeValues">[0]</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Security Log Clearing</title>
+      <single>
+        <search>
+          <query>
+            index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=1102
+            | stats count
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x65A637","0xcba700"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Network Connections by Destination</title>
+      <chart>
+        <search>
+          <query>
+            index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
+            | stats count by DestinationIp
+            | sort - count
+            | head 10
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.legend.placement">none</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Network Connections by Process</title>
+      <table>
+        <search>
+          <query>index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
+            | stats count by Image DestinationIp DestinationPort Protocol
+            | sort - count
+            | head 15</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">row</option>
+        <option name="refresh.display">progressbar</option>
+        <format type="color" field="count">
+          <colorPalette type="list">[#65A637,#F8BE34,#DC4E41]</colorPalette>
+          <scale type="threshold">null,null</scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Privileged Logon Activity</title>
+      <chart>
+        <search>
+          <query>
+            index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=4672
+            | timechart span=15m count
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Privileged Users</title>
+      <table>
+        <search>
+          <query>
+            index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=4672
+            | stats count by SubjectUserName SubjectDomainName
+            | sort - count
+            | head 15
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <format type="color" field="count">
+          <colorPalette type="list">[#65A637,#F8BE34,#DC4E41]</colorPalette>
+          <scale type="threshold">[10,50]</scale>
+        </format>
+        <option name="count">10</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Authentication Sources</title>
+      <table>
+        <search>
+          <query>index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=4625
+            | stats count by src_ip
+            | sort - count
+            | head 15</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <format type="color" field="count">
+          <colorPalette type="list">[#65A637,#F8BE34,#DC4E41]</colorPalette>
+          <scale type="threshold">[10,50]</scale>
+        </format>
+        <option name="count">10</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Windows Security Detection Events</title>
+      <chart>
+        <search>
+          <query>
+            index=windows_security sourcetype="XmlWinEventLog:Security"
+            | stats count by EventCode
+            | sort - count
+            | head 15
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.legend.placement">none</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Sysmon Event Distribution</title>
+      <chart>
+        <search>
+          <query>
+            index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+            | stats count by EventCode
+            | sort - count
+            | head 15
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.legend.placement">none</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Recent Windows Security Activity</title>
+      <table>
+        <search>
+          <query>
+            index=windows_security sourcetype="XmlWinEventLog:Security"
+            | table _time host EventCode SubjectUserName TargetUserName TargetDomainName
+            | sort 0 - _time
+            | head 25
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="count">15</option>
+        <option name="drilldown">row</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Recent Sysmon Activity</title>
+      <table>
+        <search>
+          <query>
+            index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+            | table _time host EventCode Image TargetImage TargetFilename DestinationIp DestinationPort
+            | sort 0 - _time
+            | head 25
+          </query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="count">15</option>
+        <option name="drilldown">row</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Detection Coverage</title>
+      <table>
+        <search>
+          <query>
+            | makeresults
+            | eval Detection="01 - Failed Logon Brute Force", Status="Active"
+            | append [| makeresults | eval Detection="02 - Successful Logon After Failures", Status="Active"]
+            | append [| makeresults | eval Detection="03 - Privileged Logon", Status="Active"]
+            | append [| makeresults | eval Detection="04 - Suspicious Process Creation", Status="Active"]
+            | append [| makeresults | eval Detection="05 - PowerShell Execution", Status="Active"]
+            | append [| makeresults | eval Detection="06 - Network Connection Monitoring", Status="Active"]
+            | append [| makeresults | eval Detection="07 - Process Injection / LSASS Access", Status="Active"]
+            | append [| makeresults | eval Detection="08 - Suspicious File Creation", Status="Active"]
+            | append [| makeresults | eval Detection="09 - Registry Modification", Status="Active"]
+            | append [| makeresults | eval Detection="10 - Account Creation", Status="Active"]
+            | append [| makeresults | eval Detection="11 - Privileged Group Modification", Status="Active"]
+            | append [| makeresults | eval Detection="12 - Windows Service Creation", Status="Active"]
+            | append [| makeresults | eval Detection="13 - Scheduled Task Creation", Status="Active"]
+            | append [| makeresults | eval Detection="14 - Security Log Clearing", Status="Active"]
+            | append [| makeresults | eval Detection="15 - Authentication Correlation", Status="Active"]
+            | table Detection Status
+          </query>
+        </search>
+        <format type="color" field="Status">
+          <colorPalette type="map">{"Active":"#65A637"}</colorPalette>
+        </format>
+        <option name="count">15</option>
+      </table>
+    </panel>
+  </row>
+</form>
