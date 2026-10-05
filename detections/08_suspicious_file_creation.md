@@ -1,41 +1,47 @@
-# Detection 08 - Suspicious File Creation
 
-Status: DETECTION LIBRARY
+Detection 08 - Suspicious File Creation in User Temp
 
-## Objective
-Monitor files created or overwritten on the Windows endpoint and provide a basis
-for detecting payload staging and persistence activity.
+Status: VALIDATED
 
-## Data Source
-Microsoft Sysmon
+Objective
 
-## Event
-Sysmon Event ID 11 - FileCreate
+Detect executable and script files created in user AppData Local Temp directories.
 
-## SPL
-index=windows_security sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=11
-| stats count by host Image TargetFilename
-| sort - count
+Data Source
+Index: sysmon
+Sourcetype: XmlWinEventLog:Microsoft-Windows-Sysmon/Operational
+Event ID: 11 - File Creation
+SPL
+index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=11
+| search (TargetFilename="*\\Users\\*\\AppData\\Local\\Temp\\*.exe"
+    OR TargetFilename="*\\Users\\*\\AppData\\Local\\Temp\\*.dll"
+    OR TargetFilename="*\\Users\\*\\AppData\\Local\\Temp\\*.ps1"
+    OR TargetFilename="*\\Users\\*\\AppData\\Local\\Temp\\*.bat"
+    OR TargetFilename="*\\Users\\*\\AppData\\Local\\Temp\\*.cmd"
+    OR TargetFilename="*\\Users\\*\\AppData\\Local\\Temp\\*.vbs"
+    OR TargetFilename="*\\Users\\*\\AppData\\Local\\Temp\\*.js")
+| table _time host Image TargetFilename User
+| sort 0 - _time
+Investigation
 
-## Focused Hunting Example
-index=windows_security sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=11
-| search TargetFilename="*.exe" OR TargetFilename="*.dll" OR TargetFilename="*.ps1"
-| stats count by host Image TargetFilename
-| sort - count
+Review the creating process, file path, user, file extension, and subsequent process execution.
 
-## Detection Logic
-File creation by itself is not malicious. The useful detection signal comes from
-the combination of file type, destination path, creating process and surrounding
-process/network activity.
+Validation
 
-## MITRE ATT&CK
-Context dependent.
+Validated by creating Detection8-Test.exe in the monitored VM's user Temp directory.
 
-File creation telemetry can support investigation of:
-- T1105 - Ingress Tool Transfer
-- T1547.001 - Registry Run Keys / Startup Folder
-- Malware staging
+False Positives
 
-## Tuning
-FileCreate can be noisy. Production implementations should focus on high-value
-paths, executable/script extensions and suspicious creating processes.
+Software installers, browsers, Windows diagnostics, updates, and security tools may legitimately create temporary files.
+
+MITRE ATT&CK
+
+Potential mapping: T1204/T1105, depending on the surrounding execution or download behavior.
+
+Alerting
+
+Implemented as WDL - Suspicious File Creation in User Temp.
+
+Response
+
+Investigate the creating process and determine whether the file was subsequently executed or downloaded.

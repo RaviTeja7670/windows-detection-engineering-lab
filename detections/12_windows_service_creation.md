@@ -1,39 +1,36 @@
-# Detection 12 - Windows Service Creation
 
-Status: DETECTION LIBRARY
+Detection 12 - Windows Service Creation
 
-## Objective
-Detect creation of new Windows services that could establish persistence or
-execute code with elevated privileges.
+Status: VALIDATED
 
-## Data Source
-Windows Security Event Log
+Objective
 
-## Event
-4697 - A service was installed in the system
+Detect creation of Windows services that may provide persistence or execute code with elevated privileges.
 
-## SPL
-index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=4697
-| stats count by host ServiceName ServiceFileName SubjectUserName
-| sort - count
+Data Source
 
-## Investigation
-Review:
-- ServiceName
-- ServiceFileName
-- SubjectUserName
-- Host
-- Creation time
+Windows event telemetry associated with Windows Service Control Manager activity.
 
-Pay particular attention to services whose binaries execute from unusual
-directories such as user-writable locations.
+Detection Logic
 
-## MITRE ATT&CK
+Identify service-creation events and investigate the service name, executable path, account, and creating activity.
+
+SPL
+index=windows_security sourcetype="XmlWinEventLog:Security" EventCode=7045
+| table _time host ServiceName ImagePath ServiceType StartType AccountName
+| sort 0 - _time
+Investigation
+
+Review the service executable path, service account, start type, creator context, and whether the binary is trusted.
+
+False Positives
+
+Software installation, Windows updates, endpoint management, and legitimate administration can create services.
+
+MITRE ATT&CK
+
 T1543.003 - Windows Service
 
-## Security Relevance
-Attackers can create Windows services to establish persistence or execute
-commands with elevated privileges.
+Response
 
-## Tuning
-Exclude known enterprise software deployment and management systems.
+Investigate the service binary and determine whether it is expected. Correlate with process creation and file creation telemetry.

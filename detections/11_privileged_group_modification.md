@@ -1,37 +1,43 @@
-# Detection 11 - Privileged Group Modification
 
-Status: DETECTION LIBRARY
+Detection 11 - Privileged Group Modification
 
-## Objective
-Detect users being added to security-sensitive local or domain groups.
+Status: IMPLEMENTED
 
-## Data Source
-Windows Security Event Log
+Objective
 
-## Events
-4728 - Member added to security-enabled global group
-4732 - Member added to security-enabled local group
-4756 - Member added to security-enabled universal group
+Detect additions of accounts to Windows security-enabled groups that can increase privileges.
 
-## SPL
-index=windows_security sourcetype="XmlWinEventLog:Security" EventCode IN (4728,4732,4756)
-| stats count by host EventCode SubjectUserName TargetUserName
-| sort - count
+Data Source
 
-## Investigation
-Review:
-- SubjectUserName - account performing the modification
-- TargetUserName - account being added
-- Group name
-- Host
-- Event time
+Windows Security Event Log.
 
-## MITRE ATT&CK
+Relevant Windows Security events include group-membership modification events such as Event IDs 4728, 4732, and 4756.
+
+Detection Logic
+
+Monitor security-enabled group membership changes and identify additions that may grant administrative or elevated privileges.
+
+SPL
+index=windows_security sourcetype="XmlWinEventLog:Security"
+(EventCode=4728 OR EventCode=4732 OR EventCode=4756)
+| table _time host EventCode SubjectUserName MemberName TargetUserName
+| sort 0 - _time
+Investigation
+
+Determine which account was added, which group was modified, who performed the change, and whether the change was authorized.
+
+False Positives
+
+Legitimate onboarding, administration, application deployment, and access-management workflows may modify group membership.
+
+MITRE ATT&CK
+
 T1098 - Account Manipulation
 
-## Security Relevance
-Unexpected group membership changes can provide privilege escalation or persistence.
+Response
 
-## Tuning
-Production implementations should identify privileged groups and approved
-administrative accounts before creating high-confidence alerts.
+Validate the change against approved access requests. If unauthorized, remove the membership and investigate related account activity.
+
+Note
+
+This detection should be tuned to the organization's privileged groups to reduce normal administrative noise.

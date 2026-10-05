@@ -1,38 +1,42 @@
-# Detection 09 - Suspicious Registry Modification
 
-Status: DETECTION LIBRARY
+Detection 09 - Registry Run Key Modification
 
-## Objective
-Monitor registry modifications that may indicate persistence, defense evasion
-or system configuration changes.
+Status: VALIDATED
 
-## Data Source
-Microsoft Sysmon
+Objective
 
-## Events
-Sysmon Event IDs 12, 13 and 14
+Detect modifications to Windows Registry Run and RunOnce keys that may establish persistence.
 
-- 12 = Registry object created/deleted
-- 13 = Registry value set
-- 14 = Registry object renamed
+Data Source
+Index: sysmon
+Sourcetype: XmlWinEventLog:Microsoft-Windows-Sysmon/Operational
+Event ID: 13 - Registry Value Set
+SPL
+index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=13
+| search TargetObject="*\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\*"
+    OR TargetObject="*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\*"
+| table _time host Image TargetObject Details User
+| sort 0 - _time
+Investigation
 
-## SPL
-index=windows_security sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" (EventCode=12 OR EventCode=13 OR EventCode=14)
-| stats count by host EventCode Image TargetObject Details
-| sort - count
+Review the modifying process, registry path, value details, user, and whether the configured executable or script is legitimate.
 
-## Focused Persistence Hunt
-index=windows_security sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=13
-| search TargetObject="*\\Run\\*" OR TargetObject="*\\RunOnce\\*"
-| table _time host Image TargetObject Details
-| sort - _time
+Validation
 
-## MITRE ATT&CK
-T1112 - Modify Registry
+A test Run key named Detection9-Test was created and observed in Splunk.
 
-## Investigation
-Prioritize:
-- Run / RunOnce keys
-- Security-related registry changes
-- Unexpected modifying processes
-- Changes immediately following suspicious process execution
+MITRE ATT&CK
+
+T1547.001 - Registry Run Keys / Startup Folder
+
+Alerting
+
+Implemented as WDL - Registry Run Key Modification.
+
+False Positives
+
+Legitimate applications commonly use Run keys for startup behavior.
+
+Response
+
+Identify the process making the change and investigate the referenced executable or script.

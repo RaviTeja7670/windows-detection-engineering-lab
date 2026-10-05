@@ -1,38 +1,43 @@
-# Detection 07 - Process Injection Indicators
 
-Status: DETECTION LIBRARY
+Detection 07 - Suspicious LSASS Process Access
 
-## Objective
-Identify CreateRemoteThread activity that may indicate process injection.
+Status: VALIDATED
 
-## Data Source
-Microsoft Sysmon
+Objective
 
-## Event
-Sysmon Event ID 8 - CreateRemoteThread
+Detect Sysmon Process Access events targeting LSASS that may indicate credential-access activity.
 
-## SPL
-index=windows_security sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=8
-| stats count by host SourceImage TargetImage StartAddress StartModule StartFunction
-| sort - count
+Data Source
+Index: sysmon
+Sourcetype: XmlWinEventLog:Microsoft-Windows-Sysmon/Operational
+Event ID: 10 - Process Access
+SPL
+index=sysmon sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=10
+| search TargetImage="*\\lsass.exe"
+| table _time host SourceImage TargetImage GrantedAccess CallTrace SourceUser TargetUser
+| sort 0 - _time
+Investigation
 
-## Detection Logic
-CreateRemoteThread records a thread created in another process. This can be
-associated with process injection and should be investigated in context.
+Review the source process, target process, granted access mask, source user, target user, and call trace.
 
-## MITRE ATT&CK
-T1055.001 - Dynamic-link Library Injection
+Known baseline activity should be considered before escalation.
 
-## Investigation
-Review:
-- SourceImage
-- TargetImage
-- StartAddress
-- StartModule
-- StartFunction
+False Positives
 
-Pay particular attention to unexpected source-to-target process relationships.
+Security software, Windows services, endpoint management, and legitimate diagnostic tools can access LSASS.
 
-## Tuning
-Do not automatically treat every Event ID 8 event as malicious. Security software
-and legitimate applications may also generate remote threads.
+MITRE ATT&CK
+
+T1003.001 - LSASS Memory
+
+Validation
+
+Validated against Sysmon Event ID 10 telemetry targeting lsass.exe.
+
+Alerting
+
+Implemented as WDL - Suspicious LSASS Process Access.
+
+Response
+
+Investigate the source process and access rights and correlate with credential, process, and network activity.

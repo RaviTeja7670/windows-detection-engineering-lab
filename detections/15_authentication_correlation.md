@@ -1,58 +1,49 @@
-# Detection 15 - Authentication Attack Correlation
 
-Status: DETECTION LIBRARY
+Detection 15 - Authentication Correlation
 
-## Objective
-Correlate repeated failed authentication attempts with a subsequent successful
-authentication from the same source and host.
+Status: VALIDATED
 
-## Data Source
-Windows Security Event Log
+Objective
 
-## Events
-4625 - Failed Logon
-4624 - Successful Logon
+Correlate Windows failed and successful authentication events to identify a successful logon occurring shortly after a failed logon.
 
-## SPL
-index=windows_security sourcetype="XmlWinEventLog:Security" (EventCode=4625 OR EventCode=4624)
-| bin _time span=10m
-| stats
-    count(eval(EventCode=4625)) as failed_logons
-    count(eval(EventCode=4624)) as successful_logons
-    values(EventCode) as event_codes
-    by _time host src_ip
-| where failed_logons >= 3 AND successful_logons >= 1
-| eval risk_score = 70
-| eval detection="Authentication Attack Correlation"
-| sort - risk_score - failed_logons
+Data Source
+Index: windows_security
+Sourcetype: XmlWinEventLog:Security
+Event IDs: 4624 and 4625
+SPL
+index=windows_security sourcetype="XmlWinEventLog:Security"
+(EventCode=4624 OR EventCode=4625)
+| sort 0 host _time
+| streamstats window=10 current=f
+    last(EventCode) as PreviousEventCode
+    last(_time) as PreviousEventTime
+    by host
+| where EventCode=4624 AND PreviousEventCode=4625
+| eval TimeBetween=round(_time-PreviousEventTime,2)
+| where TimeBetween <= 300
+| table _time host PreviousEventCode PreviousEventTime TimeBetween EventCode
+| sort 0 - _time
+Detection Logic
 
-## Correlation Logic
+The correlation identifies Event ID 4624 occurring after Event ID 4625 on the same host within five minutes.
 
-Multiple failed logons
-        +
-Successful logon
-        +
-Same host/source/time window
-        =
-Higher-priority investigation
+Investigation
 
-## MITRE ATT&CK
+Review source IP, account, logon type, number of preceding failures, authentication timing, and related endpoint activity.
 
-T1110 - Brute Force
-T1078 - Valid Accounts
+Validation
 
-## Risk Concept
+The detection returned multiple qualifying authentication sequences. Observed successful-logon intervals included approximately 3, 9, 11, and 12 seconds after a failed authentication event.
 
-This is a correlation/risk-oriented use case rather than a single-event detector.
-The risk score is a lab demonstration value and is not intended to represent a
-universal production risk score.
+False Positives
 
-## Investigation
+Users can legitimately enter an incorrect password and then authenticate successfully. Automated services may also retry authentication.
 
-Review:
-- Source IP
-- Host
-- Number of failed logons
-- Successful logon timing
-- Target account
-- Other activity from the same source
+MITRE ATT&CK
+
+Potential mapping includes T1078 - Valid Accounts when successful authentication follows credential-guessing activity.
+
+Response
+
+Investigate the authentication sequence and correlate it with failed-logon, process, network, and account activity.
