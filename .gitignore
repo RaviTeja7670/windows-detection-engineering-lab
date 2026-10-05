@@ -1,0 +1,19 @@
+# Splunk runtime/generated files
+*.log
+*.pid
+*.lock
+*.tmp
+
+# Credentials / secrets
+*.password
+*.secret
+secrets/
+credentials/
+
+# OS/editor files
+Thumbs.db
+.DS_Store
+.vscode/
+
+# Splunk generated metadata
+metadata/local.meta
